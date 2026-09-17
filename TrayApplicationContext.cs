@@ -1,11 +1,14 @@
 namespace VoiceNotifier;
 internal sealed class TrayApplicationContext : Form
 {
+    private enum ServiceState { Unknown, Running, Stopped }
     private readonly NotifyIcon _tray; private readonly ContextMenuStrip _trayMenu; private readonly AppConfig _config; private readonly AppLogger _log; private readonly VoiceApiClient _api; private readonly SpeechService _speech; private readonly System.Threading.Timer _timer; private int _running; private DateTime _lastSpeak;
     private readonly string _diagnosticPath;
     private readonly System.Windows.Forms.Timer _uiHeartbeat;
     private readonly RegisteredWaitHandle _showWindowRegistration;
     private bool _isExiting;
+    private ServiceState _serviceState = ServiceState.Unknown;
+    private int _pollCount;
     public TrayApplicationContext(EventWaitHandle showWindowSignal)
     {
         MaximizeBox = false; MinimizeBox = false; WindowState = FormWindowState.Minimized; ShowInTaskbar = false;
@@ -38,10 +41,54 @@ internal sealed class TrayApplicationContext : Form
     private async Task PollAsync()
     {
         if (Interlocked.Exchange(ref _running, 1) != 0 || !_config.Enabled) return;
-        bool success = false;
-        try { var messages = await _api.GetMessagesAsync(_config.Url, CancellationToken.None); success = true; if (messages.Count > 0 && (_config.CooldownSeconds == 0 || DateTime.Now - _lastSpeak >= TimeSpan.FromSeconds(_config.CooldownSeconds))) { foreach (var message in messages) _speech.Speak(message); _lastSpeak = DateTime.Now; } _tray.Text = "语音播报程序：服务正常"; }
-        catch (Exception ex) { _log.Error(ex); _tray.Text = "语音播报程序：服务不可用，正在重试"; }
-        finally { Volatile.Write(ref _running, 0); _timer.Change(TimeSpan.FromSeconds(success ? _config.IntervalSeconds : _config.RetrySeconds), Timeout.InfiniteTimeSpan); }
+        var pollStarted = DateTime.Now;
+        var pollNumber = Interlocked.Increment(ref _pollCount);
+        var serviceAvailable = false;
+        var nextDelay = _config.RetrySeconds;
+        try
+        {
+            _log.Trace($"开始第 {pollNumber} 次轮询");
+            if (!Uri.TryCreate(_config.Url, UriKind.Absolute, out var endpoint) || endpoint.Port <= 0)
+            {
+                _log.Error("接口地址无效，无法检测服务端口：" + _config.Url);
+                _tray.Text = "语音播报程序：配置错误";
+                return;
+            }
+            _log.Trace("准备检测服务端口：" + endpoint.Host + ":" + endpoint.Port);
+            serviceAvailable = await _api.CanConnectAsync(endpoint, CancellationToken.None);
+            var previous = _serviceState;
+            var current = serviceAvailable ? ServiceState.Running : ServiceState.Stopped;
+            _serviceState = current;
+            if (previous != current && previous != ServiceState.Unknown)
+            {
+                var prompt = current == ServiceState.Running ? "服务连接成功" : "服务断开";
+                _speech.Speak(prompt);
+                _log.Info($"服务状态变化：{previous} -> {current}，已播报“{prompt}”");
+            }
+            if (!serviceAvailable)
+            {
+                _log.Error($"服务端口不可连接：{endpoint.Host}:{endpoint.Port}");
+                _tray.Text = "语音播报程序：服务不可用，正在重试";
+                return;
+            }
+            _tray.Text = "语音播报程序：服务正常";
+            _log.Debug("接口地址：GET " + _config.Url);
+            var messages = await _api.GetMessagesAsync(_config.Url, CancellationToken.None);
+            nextDelay = _config.IntervalSeconds;
+            if (messages.Count > 0 && (_config.CooldownSeconds == 0 || DateTime.Now - _lastSpeak >= TimeSpan.FromSeconds(_config.CooldownSeconds)))
+            {
+                foreach (var message in messages) _speech.Speak(message);
+                _lastSpeak = DateTime.Now;
+                _log.Info($"接口返回 {messages.Count} 条有效播报数据");
+            }
+        }
+        catch (Exception ex) { _log.Error(ex); _tray.Text = serviceAvailable ? "语音播报程序：接口异常，正在重试" : "语音播报程序：服务不可用，正在重试"; }
+        finally
+        {
+            _log.Trace($"本次轮询完成，耗时 {(DateTime.Now - pollStarted).TotalMilliseconds:0} 毫秒");
+            Volatile.Write(ref _running, 0);
+            _timer.Change(TimeSpan.FromSeconds(nextDelay), Timeout.InfiniteTimeSpan);
+        }
     }
     private void ShowControlWindow()
     {

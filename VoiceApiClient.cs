@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Text.Json;
 
 namespace VoiceNotifier;
@@ -6,6 +7,14 @@ internal sealed class VoiceApiClient : IDisposable
 {
     private readonly HttpClient _client;
     public VoiceApiClient(int timeoutSeconds) { _client = new HttpClient { Timeout = TimeSpan.FromSeconds(timeoutSeconds) }; }
+    public async Task<bool> CanConnectAsync(Uri endpoint, CancellationToken token)
+    {
+        using var tcp = new TcpClient();
+        try { await tcp.ConnectAsync(endpoint.Host, endpoint.Port, token); return true; }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (SocketException) { return false; }
+        catch (Exception) { return false; }
+    }
     public async Task<IReadOnlyList<string>> GetMessagesAsync(string url, CancellationToken token)
     {
         using var response = await _client.GetAsync(url, token);
