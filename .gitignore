@@ -1,7 +1,9 @@
 bin/
 obj/
 发布版/
+发布-*/
 最终发布版/
+最终发布版*/
 VoiceNotifier/
 logs/
 startup-diagnostic.log
