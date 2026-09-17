@@ -10,7 +10,7 @@ internal sealed class TrayApplicationContext : Form
     {
         MaximizeBox = false; MinimizeBox = false; WindowState = FormWindowState.Minimized; ShowInTaskbar = false;
         Text = "VoiceNotifier 状态"; ClientSize = new Size(360, 160); StartPosition = FormStartPosition.CenterScreen;
-        var dir = AppContext.BaseDirectory; _diagnosticPath = Path.Combine(dir, "startup-diagnostic.log"); _config = AppConfig.Load(Path.Combine(dir, "config.ini")); _log = new AppLogger(Path.Combine(dir, "logs")); _api = new VoiceApiClient(_config.TimeoutSeconds); _speech = new SpeechService(_config);
+        var dir = AppContext.BaseDirectory; _diagnosticPath = Path.Combine(dir, "startup-diagnostic.log"); _config = AppConfig.Load(Path.Combine(dir, "config.ini")); _log = new AppLogger(Path.Combine(dir, "logs"), _config.LogRetentionDays, _config.LogMaxSizeMb); _api = new VoiceApiClient(_config.TimeoutSeconds); _speech = new SpeechService(_config);
         _trayMenu = new ContextMenuStrip();
         _trayMenu.Items.Add("立即检查", null, (_, _) => _ = PollAsync());
         _trayMenu.Items.Add("打开配置文件夹", null, (_, _) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", dir) { UseShellExecute = true }));
