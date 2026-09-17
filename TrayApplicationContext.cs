@@ -10,7 +10,7 @@ internal sealed class TrayApplicationContext : Form
     {
         MaximizeBox = false; MinimizeBox = false; WindowState = FormWindowState.Minimized; ShowInTaskbar = false;
         Text = "VoiceNotifier 状态"; ClientSize = new Size(360, 160); StartPosition = FormStartPosition.CenterScreen;
-        var dir = AppContext.BaseDirectory; _diagnosticPath = Path.Combine(dir, "startup-diagnostic.log"); _config = AppConfig.Load(Path.Combine(dir, "config.ini")); _log = new AppLogger(Path.Combine(dir, "logs"), _config.LogRetentionDays, _config.LogMaxSizeMb); _api = new VoiceApiClient(_config.TimeoutSeconds); _speech = new SpeechService(_config);
+        var dir = AppContext.BaseDirectory; _diagnosticPath = Path.Combine(dir, "startup-diagnostic.log"); _config = AppConfig.Load(Path.Combine(dir, "config.ini")); _log = new AppLogger(Path.Combine(dir, "logs"), _config.LogRetentionDays, _config.LogMaxSizeMb, _config.LogLevel); _api = new VoiceApiClient(_config.TimeoutSeconds); _speech = new SpeechService(_config);
         _trayMenu = new ContextMenuStrip();
         _trayMenu.Items.Add("立即检查", null, (_, _) => _ = PollAsync());
         _trayMenu.Items.Add("打开配置文件夹", null, (_, _) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", dir) { UseShellExecute = true }));
@@ -50,5 +50,6 @@ internal sealed class TrayApplicationContext : Form
     }
     private void HideControlWindow() { ShowInTaskbar = false; Hide(); }
     private void Exit() { _isExiting = true; Close(); }
+    public void LogCrash(Exception ex) => _log.Crash(ex);
     protected override void Dispose(bool disposing) { if (disposing) { File.AppendAllText(_diagnosticPath, $"{DateTime.Now:O} form-dispose{Environment.NewLine}"); _showWindowRegistration.Unregister(null); _uiHeartbeat.Dispose(); _timer.Dispose(); _tray.Visible = false; _tray.Dispose(); _speech.Dispose(); _api.Dispose(); } base.Dispose(disposing); }
 }

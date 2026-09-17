@@ -14,6 +14,7 @@ internal sealed class AppConfig
     public int CooldownSeconds { get; private set; }
     public int LogRetentionDays { get; private set; } = 30;
     public int LogMaxSizeMb { get; private set; } = 10;
+    public string LogLevel { get; private set; } = "Info";
 
     public static AppConfig Load(string path)
     {
@@ -30,6 +31,7 @@ internal sealed class AppConfig
             if (section == "polling") { if (key.Equals("intervalSeconds", StringComparison.OrdinalIgnoreCase)) c.IntervalSeconds = Positive(value, 2); if (key.Equals("requestTimeoutSeconds", StringComparison.OrdinalIgnoreCase)) c.TimeoutSeconds = Positive(value, 10); if (key.Equals("retryIntervalSeconds", StringComparison.OrdinalIgnoreCase)) c.RetrySeconds = Positive(value, 5); if (key.Equals("enabled", StringComparison.OrdinalIgnoreCase)) c.Enabled = bool.TryParse(value, out var b) && b; }
             if (section == "speech") { if (key.Equals("rate", StringComparison.OrdinalIgnoreCase)) c.Rate = Integer(value, 0, -10, 10); if (key.Equals("volume", StringComparison.OrdinalIgnoreCase)) c.Volume = Integer(value, 100, 0, 100); if (key.Equals("cooldownSeconds", StringComparison.OrdinalIgnoreCase)) c.CooldownSeconds = PositiveOrZero(value); }
             if (section == "logging") { if (key.Equals("retentionDays", StringComparison.OrdinalIgnoreCase)) c.LogRetentionDays = Positive(value, 30); if (key.Equals("maxFileSizeMb", StringComparison.OrdinalIgnoreCase)) c.LogMaxSizeMb = Positive(value, 10); }
+            if (section == "logging" && key.Equals("level", StringComparison.OrdinalIgnoreCase)) c.LogLevel = value;
         }
         return c;
     }

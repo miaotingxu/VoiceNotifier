@@ -25,6 +25,8 @@ internal static class Program
             TaskScheduler.UnobservedTaskException += (_, e) => { File.AppendAllText(diagnosticPath, $"{DateTime.Now:O} task-exception={e.Exception}{Environment.NewLine}"); e.SetObserved(); };
             File.AppendAllText(diagnosticPath, $"{DateTime.Now:O} winforms-initialized{Environment.NewLine}");
             using var trayContext = new TrayApplicationContext(showWindowSignal);
+            Application.ThreadException += (_, e) => trayContext.LogCrash(e.Exception);
+            AppDomain.CurrentDomain.UnhandledException += (_, e) => { if (e.ExceptionObject is Exception ex) trayContext.LogCrash(ex); };
             File.AppendAllText(diagnosticPath, $"{DateTime.Now:O} tray-context-created{Environment.NewLine}");
             Application.Run(trayContext);
             File.AppendAllText(diagnosticPath, $"{DateTime.Now:O} message-loop-exited{Environment.NewLine}");
