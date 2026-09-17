@@ -1,0 +1,10 @@
+bin/
+obj/
+发布版/
+最终发布版/
+logs/
+startup-diagnostic.log
+startup-error.log
+*.user
+*.suo
+.vs/
