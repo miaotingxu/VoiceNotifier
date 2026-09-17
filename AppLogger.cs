@@ -9,7 +9,14 @@ internal sealed class AppLogger
     public void Error(Exception ex) => Write(3, "Error", ex.ToString(), true);
     public void Error(string message) => Write(3, "Error", message, true);
     public void Crash(Exception ex) => Write(3, "Error", "捕获到崩溃异常：" + ex, true);
-    private string NewPath(bool error) => Path.Combine(_baseDir, $"VoiceNotifier-{(error ? "error-" : "")}{DateTime.Now:yyyy-MM-dd-HHmmss}.log");
+    private string NewPath(bool error)
+    {
+        var prefix = $"VoiceNotifier-{(error ? "error-" : "")}{DateTime.Now:yyyy-MM-dd-HH}";
+        var path = Path.Combine(_baseDir, prefix + ".log");
+        var index = 2;
+        while (File.Exists(path)) path = Path.Combine(_baseDir, $"{prefix}-{index++}.log");
+        return path;
+    }
     private void Write(int level, string name, string message, bool error) { if (level < _minimum) return; try { lock (_sync) { var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{name}] {message}{Environment.NewLine}"; ref var path = ref error ? ref _errorPath : ref _normalPath; if (File.Exists(path) && new FileInfo(path).Length + System.Text.Encoding.UTF8.GetByteCount(line) > _maxBytes) path = NewPath(error); File.AppendAllText(path, line); Cleanup(); } } catch { } }
     private void Cleanup() { try { var cutoff = DateTime.Now.AddDays(-_retentionDays); foreach (var file in Directory.EnumerateFiles(_baseDir, "VoiceNotifier-*.log")) if (File.GetLastWriteTime(file) < cutoff) File.Delete(file); } catch { } }
 }
